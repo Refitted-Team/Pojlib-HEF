@@ -1,7 +1,6 @@
 package pojlib.util;
 
 import android.app.Activity;
-import android.app.ActivityManager;
 import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.LinkProperties;
@@ -26,19 +25,12 @@ import java.util.List;
 import java.util.Map;
 
 import pojlib.API;
-
-import pojlib.UnityPlayerActivity;
-import pojlib.install.Installer;
-import pojlib.install.MinecraftMeta;
-import pojlib.util.json.MinecraftInstances;
+import pojlib.android.BuildConfig;
 
 public class JREUtils {
     private JREUtils() {}
 
     public static String LD_LIBRARY_PATH;
-    public static String jvmLibraryPath;
-    private static String sNativeLibDir;
-    private static String runtimeDir;
 
     public static String findInLdLibPath(String libName) {
         if(Os.getenv("LD_LIBRARY_PATH")==null) {
@@ -60,7 +52,7 @@ public class JREUtils {
         return libName;
     }
 
-    public static boolean initJavaRuntime() {
+    public static boolean initJavaRuntime(String jvmHome) {
         dlopen(findInLdLibPath("server/libjvm.so"));
         dlopen(findInLdLibPath("libverify.so"));
         dlopen(findInLdLibPath("libjava.so"));
@@ -73,26 +65,8 @@ public class JREUtils {
         dlopen(findInLdLibPath("libjli.so"));
 
         String dlerr = dlerror();
-        if(dlerr.contains(runtimeDir)) {
+        if(dlerr.contains(jvmHome)) {
             Logger.getInstance().appendToLog("ERROR! Could not dlopen libraries! " + dlerr);
-            return false;
-        }
-
-        return true;
-    }
-
-    public static boolean initializeExtraNatives(MinecraftInstances.Instance instance) {
-        if(instance.extraNatives == null) {
-            return false;
-        }
-
-        for(String nativeLib : instance.extraNatives.split(File.pathSeparator)) {
-            dlopen(nativeLib);
-        }
-
-        String dlerr = dlerror();
-        if(dlerr.contains(runtimeDir)) {
-            Logger.getInstance().appendToLog("ERROR! Could not dlopen extra natives! " + dlerr);
             return false;
         }
 
@@ -141,32 +115,36 @@ public class JREUtils {
         Log.i("jrelog-logcat","Logcat thread started");
     }
 
-    public static void relocateLibPath(final Context ctx, MinecraftInstances.Instance instance) {
-        sNativeLibDir = ctx.getApplicationInfo().nativeLibraryDir;
-
-        LD_LIBRARY_PATH = ctx.getFilesDir() + "/runtimes/JRE/bin:" + ctx.getFilesDir() + "/runtimes/JRE/lib:" +
-                "/system/lib64:/vendor/lib64:/vendor/lib64/hw:" + ctx.getDataDir().toPath().resolve(instance.instanceName) + ":" +
-                sNativeLibDir;
+    // Step 1. set
+    public static void relocateLibPath(Context ctx, String jvmHome) {
+        LD_LIBRARY_PATH =
+                jvmHome + "/bin:" +
+                jvmHome + "/lib:" +
+                "/system/lib64:" +
+                "/vendor/lib64:" +
+                "/vendor/lib64/hw:" +
+                //ctx.getDataDir().toPath().resolve(instance.instanceName) + ":" +
+                ctx.getApplicationInfo().nativeLibraryDir;
     }
 
-    public static void setJavaEnvironment(Activity activity, MinecraftInstances.Instance instance) throws Throwable {
+    public static void setJavaEnvironment(Activity activity, String gameDir, String vrModel, String jvmHome) throws Throwable {
         Map<String, String> envMap = new ArrayMap<>();
         envMap.put("POJLIB_NATIVEDIR", activity.getApplicationInfo().nativeLibraryDir);
-        envMap.put("JAVA_HOME", activity.getFilesDir() + "/runtimes/JRE");
-        envMap.put("HOME", instance.gameDir);
+        envMap.put("JAVA_HOME", jvmHome);
+        envMap.put("HOME", gameDir);
         //envMap.put("APP_HOME", Constants.USER_HOME);
         envMap.put("TMPDIR", activity.getCacheDir().getAbsolutePath());
-        envMap.put("VR_MODEL", API.model);
+        envMap.put("VR_MODEL", vrModel);
         envMap.put("POJLIB_RENDERER", "MobileGLUES");
         envMap.put("MG_DIR_PATH", activity.getFilesDir() + "/mg");
 
         envMap.put("LD_LIBRARY_PATH", LD_LIBRARY_PATH);
-        envMap.put("PATH", activity.getFilesDir() + "/runtimes/JRE/bin:" + Os.getenv("PATH"));
+        envMap.put("PATH", jvmHome + "/bin:" + Os.getenv("PATH"));
 
         File mg = new File(activity.getFilesDir() + "/mg");
         mg.mkdirs();
 
-        File customEnvFile = new File(Constants.USER_HOME, "custom_env.txt");
+        File customEnvFile = new File(activity.getExternalFilesDir(null), "custom_env.txt");
         if (customEnvFile.exists() && customEnvFile.isFile()) {
             BufferedReader reader = new BufferedReader(new FileReader(customEnvFile));
             String line;
@@ -183,58 +161,26 @@ public class JREUtils {
             Os.setenv(env.getKey(), env.getValue(), true);
         }
 
-        File serverFile = new File(activity.getFilesDir() + "/runtimes/JRE/lib/server/libjvm.so");
-        jvmLibraryPath = activity.getFilesDir() + "/runtimes/JRE/lib/" + (serverFile.exists() ? "server" : "client");
+        File serverFile = new File(jvmHome + "/lib/server/libjvm.so");
+        String jvmLibraryPath = jvmHome + "/lib/" + (serverFile.exists() ? "server" : "client");
         Log.d("DynamicLoader","Base LD_LIBRARY_PATH: "+LD_LIBRARY_PATH);
         Log.d("DynamicLoader","Internal LD_LIBRARY_PATH: "+jvmLibraryPath+":"+LD_LIBRARY_PATH);
         setLdLibraryPath(jvmLibraryPath+":"+LD_LIBRARY_PATH);
     }
 
-    // Called before game launch to ensure all files are present and correct
-    public static boolean prelaunchCheck(Activity activity, MinecraftInstances.Instance instance) throws Throwable {
-        runtimeDir = activity.getFilesDir() + "/runtimes/JRE";
-        JREUtils.relocateLibPath(activity, instance);
-        setJavaEnvironment(activity, instance);
+    public static int launchJavaVM(Activity activity, List<String> JVMArgs, String[] mcArgs, String[] mcAdditionalArgs, String gameDir, String memoryValue, String vrModel, String mainClass, String jvmHome) throws Throwable {
+        List<String> userArgs = getJavaArgs(activity, gameDir, jvmHome);
 
-        UnityPlayerActivity.installLWJGL(activity);
-        Installer.installClient(MinecraftMeta.getVersionInfo(instance.versionName), Constants.USER_HOME).get();
-        Installer.installLibraries(MinecraftMeta.getVersionInfo(instance.versionName), Constants.USER_HOME).get();
-        Installer.installAssets(MinecraftMeta.getVersionInfo(instance.versionName), Constants.USER_HOME).get();
+        Logger.getInstance().appendToLog("Setting JVM memory to " + memoryValue + "MB");
 
-        Installer.installJVM(activity, false);
-        if(!initJavaRuntime()) {
-            Installer.installJVM(activity, true);
-            return initJavaRuntime();
-        }
+        userArgs.add("-Xms" + 1024 + "M");
+        userArgs.add("-Xmx" + memoryValue + "M");
 
-        return true;
-    }
 
-    public static int launchJavaVM(final Activity activity, final List<String> JVMArgs, MinecraftInstances.Instance instance) throws Throwable {
-        final String graphicsLib = loadGraphicsLibrary();
-        List<String> userArgs = getJavaArgs(activity, instance);
-
-        //Add automatically generated args
-        if (API.customRAMValue) {
-            Logger.getInstance().appendToLog("Setting JVM memory to " + API.memoryValue + "MB (Custom)");
-            userArgs.add("-Xms" + API.memoryValue + "M");
-            userArgs.add("-Xmx" + API.memoryValue + "M");
-        } else {
-            ActivityManager manager = (ActivityManager) activity.getSystemService(Activity.ACTIVITY_SERVICE);
-            ActivityManager.MemoryInfo ami = new ActivityManager.MemoryInfo();
-            manager.getMemoryInfo(ami);
-            long availMem = (ami.availMem-ami.threshold)/(1024*1024);
-            long allocatedRam = Math.max(availMem, 1536);
-
-            Logger.getInstance().appendToLog("Setting JVM memory to " + allocatedRam + "MB");
-
-            userArgs.add("-Xms" + 1024 + "M");
-            userArgs.add("-Xmx" + allocatedRam + "M");
-        }
-
-        if(!initializeExtraNatives(instance)) {
+        // TODO add per-instance natives
+        /*if(!initializeExtraNatives(instance)) {
             Logger.getInstance().appendToLog("Some libraries did not dlopen properly. This can be safely ignored in most cases.");
-        }
+        }*/
 
         // Garbage collection
         userArgs.add("-XX:+UnlockExperimentalVMOptions");
@@ -242,23 +188,23 @@ public class JREUtils {
         userArgs.add("-XX:+ZGenerational");
         userArgs.add("-XX:-ZProactive");
         userArgs.add("-XX:+UnlockDiagnosticVMOptions");
-        userArgs.add("-XX:+DisableExplicitGC");
 
-        userArgs.add("-Dorg.lwjgl.opengl.libname=" + graphicsLib);
+        userArgs.add("-Dorg.lwjgl.opengl.libname=" + loadGraphicsLibrary());
         userArgs.add("-Dorg.lwjgl.opengles.libname=" + "/system/lib64/libGLESv3.so");
         userArgs.add("-Dorg.lwjgl.egl.libname=" + "/system/lib64/libEGL_dri.so");
 
         userArgs.addAll(JVMArgs);
         System.out.println(JVMArgs);
 
-        if (API.currentAcc != null && !API.currentAcc.uuid.isEmpty()) {
-            System.out.println("UUID: " + API.currentAcc.uuid);
-        } else {
-            System.out.println("UUID is null! Make sure to log in!");
-        }
+        // this is where old pojlib would have opened its natives
 
-        chdir(instance.gameDir);
+        chdir(gameDir);
         userArgs.add(0,"java"); //argv[0] is the program name according to C standard.
+        userArgs.add(mainClass);
+        userArgs.addAll(Arrays.asList(mcArgs));
+        userArgs.addAll(Arrays.asList(mcAdditionalArgs));
+
+        Logger.getInstance().appendToLog(BuildConfig.DEBUG ? String.join("\n", userArgs) : "Release mode, not dumping args."); // Dump args if debug mode
 
         int exitCode = VMLauncher.launchJVM(userArgs.toArray(new String[0]));
         Logger.getInstance().appendToLog("Java Exit code: " + exitCode);
@@ -297,8 +243,8 @@ public class JREUtils {
      * @param ctx The application context
      * @return A list filled with args.
      */
-    public static List<String> getJavaArgs(Context ctx, MinecraftInstances.Instance instance) {
-        File resConfFile = new File(Constants.USER_HOME + "/hacks/resolv.conf");
+    public static List<String> getJavaArgs(Context ctx, String gameDir, String jvmHome) {
+        File resConfFile = new File(ctx.getExternalFilesDir(null) , "/hacks/resolv.conf");
         try {
             if(!resConfFile.exists()) {
                 resConfFile.createNewFile();
@@ -308,9 +254,9 @@ public class JREUtils {
             Logger.getInstance().appendToLog("Couldn't write DNS servers! " + e.getMessage());
         }
         return new ArrayList<>(Arrays.asList(
-                "-Djava.home=" + new File(ctx.getFilesDir(), "runtimes/JRE"),
+                "-Djava.home=" + jvmHome,
                 "-Djava.io.tmpdir=" + ctx.getCacheDir().getAbsolutePath(),
-                "-Duser.home=" + instance.gameDir,
+                "-Duser.home=" + gameDir,
                 "-Duser.language=" + System.getProperty("user.language"),
                 "-Dos.name=Linux",
                 "-Dos.version=Android-" + Build.VERSION.RELEASE,
@@ -322,7 +268,7 @@ public class JREUtils {
                 "-Dglfwstub.windowHeight=" + 720,
                 "-Dglfwstub.initEgl=false",
                 "-Dlog4j2.formatMsgNoLookups=true", //Log4j RCE mitigation
-                "-Dnet.minecraft.clientmodname=" + "QuestCraft",
+                "-Dnet.minecraft.clientmodname=" + "Derifted",
                 "-Dext.net.resolvPath=" + resConfFile,
                 "-Dsodium.checks.issue2561=false",
                 "-Dorg.sqlite.lib.path=" + ctx.getApplicationInfo().nativeLibraryDir

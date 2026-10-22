@@ -24,7 +24,7 @@ public class Logger {
     }
 
     private Logger(String fileName){
-        mLogFile = new File(Constants.USER_HOME, fileName);
+        mLogFile = new File(fileName); // Todo betterer
         // Make a new instance of the log file
         mLogFile.delete();
         try {

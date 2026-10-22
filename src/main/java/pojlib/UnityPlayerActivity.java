@@ -7,19 +7,14 @@ import static org.lwjgl.glfw.CallbackBridge.sendMouseButton;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.app.Activity;
 import android.app.ActivityGroup;
-import android.app.ActivityManager;
 import android.content.ClipData;
 import android.content.ClipboardManager;
-import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Process;
-import android.util.DisplayMetrics;
-import android.view.InputDevice;
 import android.util.DisplayMetrics;
 import android.view.InputDevice;
 import android.view.KeyEvent;
@@ -32,12 +27,6 @@ import com.unity3d.player.UnityPlayer;
 
 import org.lwjgl.glfw.CallbackBridge;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.Objects;
-
 import fr.spse.gamepad_remapper.RemapperManager;
 import fr.spse.gamepad_remapper.RemapperView;
 import pojlib.input.AWTInputBridge;
@@ -46,11 +35,6 @@ import pojlib.input.GrabListener;
 import pojlib.input.LwjglGlfwKeycode;
 import pojlib.input.gamepad.DefaultDataProvider;
 import pojlib.input.gamepad.Gamepad;
-import pojlib.util.Constants;
-import pojlib.util.FileUtil;
-import pojlib.util.Logger;
-import pojlib.util.download.DownloadManager;
-import pojlib.util.download.DownloadUtils;
 
 public class UnityPlayerActivity extends ActivityGroup implements IUnityPlayerLifecycleEvents, GrabListener
 {
@@ -60,7 +44,6 @@ public class UnityPlayerActivity extends ActivityGroup implements IUnityPlayerLi
 
     private RemapperManager mInputManager;
 
-    private boolean mLastGrabState = false;
 
     // Override this in your custom UnityPlayerActivity to tweak the command line arguments passed to the Unity Android Player
     // The command line arguments are passed as a string, separated by spaces
@@ -85,8 +68,6 @@ public class UnityPlayerActivity extends ActivityGroup implements IUnityPlayerLi
 
     // Setup activity layout
     @Override protected void onCreate(Bundle savedInstanceState) {
-        Constants.initConstants(this);
-
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         super.onCreate(savedInstanceState);
 
@@ -118,24 +99,6 @@ public class UnityPlayerActivity extends ActivityGroup implements IUnityPlayerLi
                 .remapDpad(true));
 
         CallbackBridge.nativeSetUseInputStackQueue(true);
-    }
-
-    public static String installLWJGL(Activity activity) throws IOException {
-        Logger.getInstance().appendToLog("Checking LWJGL");
-        File lwjgl = new File(Constants.USER_HOME + "/lwjgl3/lwjgl-glfw-classes.jar");
-        byte[] lwjglAsset = FileUtil.loadFromAssetToByte(activity, "lwjgl/lwjgl-glfw-classes.jar");
-
-        if (!lwjgl.exists()) {
-            Objects.requireNonNull(lwjgl.getParentFile()).mkdirs();
-            FileUtil.write(lwjgl.getAbsolutePath(), lwjglAsset);
-        } else if (!FileUtil.matchingAssetFile(lwjgl, lwjglAsset)) {
-            lwjgl.delete();
-            Objects.requireNonNull(lwjgl.getParentFile()).mkdirs();
-            FileUtil.write(lwjgl.getAbsolutePath(), lwjglAsset);
-        }
-
-        Logger.getInstance().appendToLog("LWJGL installed");
-        return lwjgl.getAbsolutePath();
     }
 
     public void reinitUnity() {
@@ -173,17 +136,7 @@ public class UnityPlayerActivity extends ActivityGroup implements IUnityPlayerLi
         CallbackBridge.physicalWidth = currentDisplayMetrics.widthPixels;
         CallbackBridge.physicalHeight = currentDisplayMetrics.heightPixels;
     }
-
-    public static float dpToPx(float dp) {
-        //Better hope for the currentDisplayMetrics to be good
-        return dp * currentDisplayMetrics.density;
-    }
-
-    public static float pxToDp(float px){
-        //Better hope for the currentDisplayMetrics to be good
-        return px / currentDisplayMetrics.density;
-    }
-
+    // used in natives
     public static void querySystemClipboard() {
         ClipData clipData = GLOBAL_CLIPBOARD.getPrimaryClip();
         if(clipData == null) {
@@ -200,6 +153,7 @@ public class UnityPlayerActivity extends ActivityGroup implements IUnityPlayerLi
         AWTInputBridge.nativeClipboardReceived(clipItemText.toString(), "plain");
     }
 
+    // used in natives
     public static void putClipboardData(String data, String mimeType) {
         ClipData clipData = null;
         switch(mimeType) {

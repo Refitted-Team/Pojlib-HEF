@@ -6,6 +6,7 @@ android {
     ndkVersion = "26.1.10909125"
     compileSdkVersion = "android-34"
     defaultConfig {
+        buildConfigField "String", "BUILD_TIME", "\"${new Date().format('yyyy-MM-dd HH:mm:ss')}\""
         minSdk 29
         multiDexEnabled true
         ndk.stl = "c++_shared"

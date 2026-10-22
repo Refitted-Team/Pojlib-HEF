@@ -29,7 +29,6 @@ import static pojlib.input.gamepad.GamepadJoystick.DIRECTION_SOUTH_EAST;
 import static pojlib.input.gamepad.GamepadJoystick.DIRECTION_SOUTH_WEST;
 import static pojlib.input.gamepad.GamepadJoystick.DIRECTION_WEST;
 import static pojlib.input.gamepad.GamepadJoystick.isJoystickEvent;
-import static pojlib.util.MCOptionUtils.getMcScale;
 
 import androidx.core.math.MathUtils;
 
@@ -37,7 +36,6 @@ import fr.spse.gamepad_remapper.GamepadHandler;
 import fr.spse.gamepad_remapper.Settings;
 import pojlib.input.GrabListener;
 import pojlib.input.LwjglGlfwKeycode;
-import pojlib.util.MCOptionUtils;
 
 public class Gamepad implements GrabListener, GamepadHandler {
 
@@ -70,9 +68,6 @@ public class Gamepad implements GrabListener, GamepadHandler {
     private final Choreographer mScreenChoreographer;
     private long mLastFrameTime;
 
-    /* Listen for change in gui scale */
-    @SuppressWarnings("FieldCanBeLocal") //the field is used in a WeakReference
-    private final MCOptionUtils.MCOptionListener mGuiScaleListener = () -> notifyGUISizeChange(getMcScale());
 
     private final GamepadDataProvider mMapProvider;
 
@@ -89,9 +84,6 @@ public class Gamepad implements GrabListener, GamepadHandler {
         };
         mScreenChoreographer.postFrameCallback(frameCallback);
         mLastFrameTime = System.nanoTime();
-
-        /* Add the listener for the cross hair */
-        MCOptionUtils.addMCOptionListener(mGuiScaleListener);
 
         mLeftJoystick = new GamepadJoystick(AXIS_X, AXIS_Y, inputDevice);
         mRightJoystick = new GamepadJoystick(AXIS_Z, AXIS_RZ, inputDevice);
@@ -121,11 +113,6 @@ public class Gamepad implements GrabListener, GamepadHandler {
     public void updateJoysticks(){
         updateDirectionalJoystick();
         updateMouseJoystick();
-    }
-
-    public void notifyGUISizeChange(int newSize){
-        //Change the pointer size to match UI
-        int size = (int) ((22 * newSize) / mScaleFactor);
     }
 
 
