@@ -30,7 +30,8 @@ public class API {
     // Step 1. check the prelaunch stuff
     @SuppressWarnings("unused")
     public static boolean prelaunch(Activity activity, String gameDir, String vrModel, String jvmHome) throws Throwable {
-        gameReady = false; // do betterer
+        gameReady = false; // todo: do betterer
+        JREUtils.patchJre(activity, jvmHome);
         JREUtils.relocateLibPath(activity, jvmHome);
         setJavaEnvironment(activity, gameDir, vrModel, jvmHome);
         return initJavaRuntime(jvmHome);

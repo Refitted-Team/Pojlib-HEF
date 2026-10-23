@@ -13,16 +13,12 @@ import android.util.Log;
 
 import com.oracle.dalvik.VMLauncher;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.net.InetAddress;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.nio.file.Files;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.*;
 
 import pojlib.API;
 import pojlib.android.BuildConfig;
@@ -52,6 +48,35 @@ public class JREUtils {
         return libName;
     }
 
+    // Source - https://stackoverflow.com/a/6293816
+    // Posted by Jeff Foster, modified by community. See post 'Timeline' for change history
+    // Retrieved 2026-10-23, License - CC BY-SA 3.0
+
+    public static byte[] createSha1(File file) throws NoSuchAlgorithmException {
+        MessageDigest digest = MessageDigest.getInstance("SHA-1");
+        try (InputStream fis = Files.newInputStream(file.toPath())){
+            int n = 0;
+            byte[] buffer = new byte[8192];
+            while (n != -1) {
+                n = fis.read(buffer);
+                if (n > 0) {
+                    digest.update(buffer, 0, n);
+                }
+            }
+        }
+        catch (Exception e) {e.printStackTrace();} // the ol landlord special
+        return digest.digest();
+    }
+
+    /// read the tin lol
+    public static void patchJre(Activity activity, String jvmHome) throws IOException, NoSuchAlgorithmException {
+        File nativeLib = new File(activity.getApplicationInfo().nativeLibraryDir + "/libawt_xawt.so"); // xawt_fake.c
+        File outputFile = new File(jvmHome + "/lib/libawt_xawt.so");
+        if (createSha1(nativeLib) == createSha1(outputFile)) return;
+        Files.copy(nativeLib.toPath(), outputFile.toPath());
+    }
+
+
     public static boolean initJavaRuntime(String jvmHome) {
         dlopen(findInLdLibPath("server/libjvm.so"));
         dlopen(findInLdLibPath("libverify.so"));
@@ -65,7 +90,7 @@ public class JREUtils {
         dlopen(findInLdLibPath("libjli.so"));
 
         String dlerr = dlerror();
-        if(dlerr.contains(jvmHome)) {
+        if(dlerr.contains(jvmHome)) { // wghat the fuck?
             Logger.getInstance().appendToLog("ERROR! Could not dlopen libraries! " + dlerr);
             return false;
         }
@@ -115,7 +140,6 @@ public class JREUtils {
         Log.i("jrelog-logcat","Logcat thread started");
     }
 
-    // Step 1. set
     public static void relocateLibPath(Context ctx, String jvmHome) {
         LD_LIBRARY_PATH =
                 jvmHome + "/bin:" +
