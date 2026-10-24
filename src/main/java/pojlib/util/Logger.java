@@ -1,5 +1,6 @@
 package pojlib.util;
 
+import android.content.Context;
 import androidx.annotation.Keep;
 
 import java.io.File;
@@ -13,33 +14,35 @@ import java.lang.ref.WeakReference;
 @Keep
 public class Logger {
 
+    private static Logger theLogger;
+
+
     /* Instance variables */
     private final File mLogFile;
-    private PrintStream mLogStream;
+    private final PrintStream mLogStream;
     private WeakReference<eventLogListener> mLogListenerWeakReference = null;
 
-    /* No public construction */
-    private Logger(){
-        this("latestlog.txt");
-    }
 
-    private Logger(String fileName){
-        mLogFile = new File(fileName); // Todo betterer
+    private Logger(File logFile) throws IOException {
         // Make a new instance of the log file
-        mLogFile.delete();
-        try {
-            mLogFile.createNewFile();
-            mLogStream = new PrintStream(mLogFile.getAbsolutePath());
-        }catch (IOException e){e.printStackTrace();}
+        if (logFile.exists()) logFile.delete();
+        logFile.createNewFile();
+        mLogStream = new PrintStream(logFile.getAbsolutePath());
+        mLogFile = logFile;
 
     }
 
-    private static final class SLoggerSingletonHolder {
-        static final Logger sLoggerSingleton = new Logger();
-    }
 
     public static Logger getInstance(){
-        return SLoggerSingletonHolder.sLoggerSingleton;
+        Logger loge = theLogger;
+        if (loge == null) throw new RuntimeException("Logger not initalized");
+        return loge;
+    }
+
+    public static synchronized void begin(Context context) throws IOException {
+        Logger current = theLogger;
+        if (current != null) current.shutdown();
+        theLogger = new Logger(new File(context.getExternalFilesDir(null), "lastlog.txt"));
     }
 
 
@@ -53,15 +56,6 @@ public class Logger {
     public void appendToLogUnchecked(String text){
         mLogStream.println(text);
         notifyLogListener(text);
-    }
-
-    /** Reset the log file, effectively erasing any previous logs */
-    public void reset(){
-        try{
-            mLogFile.delete();
-            mLogFile.createNewFile();
-            mLogStream = new PrintStream(mLogFile.getAbsolutePath());
-        }catch (IOException e){ e.printStackTrace();}
     }
 
     /** Disables the printing */

@@ -35,6 +35,7 @@ public class API {
     public static String prelaunch(Activity activity, String gameDir, String vrModel, String jvmHome) {
         gameReady = false;
         try {
+            Logger.begin(activity);
             JREUtils.patchJre(activity, jvmHome);
             JREUtils.relocateLibPath(activity, jvmHome);
             setJavaEnvironment(activity, gameDir, vrModel, jvmHome);
