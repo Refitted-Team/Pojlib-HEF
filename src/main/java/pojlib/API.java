@@ -20,6 +20,8 @@ import static pojlib.util.JREUtils.setJavaEnvironment;
 
 public class API {
 
+    // todo: fix this with like a callback or something
+
     /// this is referenced from native code in vloader.cpp.
     /// this variable is used to check if the vr mod is ready to render.
     /// the launcher should de-initialize as soon as reasonably possibly when this is set.
@@ -28,13 +30,19 @@ public class API {
 
 
     // Step 1. check the prelaunch stuff
+    /// @return null if everything went well, a non-null string if there's an error.
     @SuppressWarnings("unused")
-    public static boolean prelaunch(Activity activity, String gameDir, String vrModel, String jvmHome) throws Throwable {
-        gameReady = false; // todo: do betterer
-        JREUtils.patchJre(activity, jvmHome);
-        JREUtils.relocateLibPath(activity, jvmHome);
-        setJavaEnvironment(activity, gameDir, vrModel, jvmHome);
-        return initJavaRuntime(jvmHome);
+    public static String prelaunch(Activity activity, String gameDir, String vrModel, String jvmHome) {
+        gameReady = false;
+        try {
+            JREUtils.patchJre(activity, jvmHome);
+            JREUtils.relocateLibPath(activity, jvmHome);
+            setJavaEnvironment(activity, gameDir, vrModel, jvmHome);
+            return initJavaRuntime(jvmHome);
+        } catch (Throwable e) {
+            e.printStackTrace();
+            return e.getMessage();
+        }
     }
 
 
@@ -80,14 +88,14 @@ public class API {
         JREUtils.redirectAndPrintJRELog();
         VLoader.setAndroidInitInfo(activity);
         try {
-            JREUtils.launchJavaVM(activity, allArgs, mcArgs, mcAdditionalArgs, gameDir, memoryValue, vrModel, mainClass, jvmHome);
+            JREUtils.launchJavaVM(activity, allArgs, mcArgs, mcAdditionalArgs, gameDir, memoryValue, mainClass, jvmHome);
         } catch (Throwable t) {
             throw new RuntimeException("JVM has stopped.", t);
         }
     }
 
     @SuppressWarnings("unused")
-    public static String getPojlibInfo() {
+    public static String getBackendInfo() {
         return  "Pojlib " + BuildConfig.BUILD_TYPE + " " + BuildConfig.BUILD_TIME;
     }
 

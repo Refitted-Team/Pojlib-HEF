@@ -91,8 +91,7 @@ static jint launchJVM(int margc, char** margv) {
    }
    LOGD("Found JLI lib");
 
-   JLI_Launch_func *pJLI_Launch =
-          (JLI_Launch_func *)dlsym(libjli, "JLI_Launch");
+   JLI_Launch_func *pJLI_Launch = (JLI_Launch_func *)dlsym(libjli, "JLI_Launch");
     // Boardwalk: silence
     // LOGD("JLI_Launch = 0x%x", *(int*)&pJLI_Launch);
 

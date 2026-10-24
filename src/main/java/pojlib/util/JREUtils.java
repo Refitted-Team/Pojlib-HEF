@@ -16,6 +16,7 @@ import com.oracle.dalvik.VMLauncher;
 import java.io.*;
 import java.net.InetAddress;
 import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
@@ -72,12 +73,11 @@ public class JREUtils {
     public static void patchJre(Activity activity, String jvmHome) throws IOException, NoSuchAlgorithmException {
         File nativeLib = new File(activity.getApplicationInfo().nativeLibraryDir + "/libawt_xawt.so"); // xawt_fake.c
         File outputFile = new File(jvmHome + "/lib/libawt_xawt.so");
-        if (createSha1(nativeLib) == createSha1(outputFile)) return;
-        Files.copy(nativeLib.toPath(), outputFile.toPath());
+        if (!nativeLib.exists() || outputFile.exists() && createSha1(nativeLib) == createSha1(outputFile)) return;
+        Files.copy(nativeLib.toPath(), outputFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
     }
 
-
-    public static boolean initJavaRuntime(String jvmHome) {
+    public static String initJavaRuntime(String jvmHome) {
         dlopen(findInLdLibPath("server/libjvm.so"));
         dlopen(findInLdLibPath("libverify.so"));
         dlopen(findInLdLibPath("libjava.so"));
@@ -91,11 +91,12 @@ public class JREUtils {
 
         String dlerr = dlerror();
         if(dlerr.contains(jvmHome)) { // wghat the fuck?
-            Logger.getInstance().appendToLog("ERROR! Could not dlopen libraries! " + dlerr);
-            return false;
+            String error = "ERROR! Could not dlopen libraries! " + dlerr;
+            Logger.getInstance().appendToLog(error);
+            return error;
         }
 
-        return true;
+        return null;
     }
 
     public static void redirectAndPrintJRELog() {
@@ -192,7 +193,7 @@ public class JREUtils {
         setLdLibraryPath(jvmLibraryPath+":"+LD_LIBRARY_PATH);
     }
 
-    public static int launchJavaVM(Activity activity, List<String> JVMArgs, String[] mcArgs, String[] mcAdditionalArgs, String gameDir, String memoryValue, String vrModel, String mainClass, String jvmHome) throws Throwable {
+    public static int launchJavaVM(Activity activity, List<String> JVMArgs, String[] mcArgs, String[] mcAdditionalArgs, String gameDir, String memoryValue, String mainClass, String jvmHome) {
         List<String> userArgs = getJavaArgs(activity, gameDir, jvmHome);
 
         Logger.getInstance().appendToLog("Setting JVM memory to " + memoryValue + "MB");
