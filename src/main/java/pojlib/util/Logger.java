@@ -42,7 +42,7 @@ public class Logger {
     public static synchronized void begin(Context context) throws IOException {
         Logger current = theLogger;
         if (current != null) current.shutdown();
-        theLogger = new Logger(new File(context.getExternalFilesDir(null), "lastlog.txt"));
+        theLogger = new Logger(new File(context.getExternalFilesDir(null), "latestlog.txt"));
     }
 
 

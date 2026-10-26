@@ -60,7 +60,6 @@ public class API {
      * @param accessToken The Minecraft login token
      * @param userType Should be "msa" always, "mojang" is legacy
      * @param memoryValue The amount of ram to allocate to Minecraft
-     * @param vrModel The headset's model
      */
     @SuppressWarnings("unused")
     public static void startGame(
@@ -75,7 +74,6 @@ public class API {
             String userType,
             String versionType,
             String memoryValue,
-            String vrModel,
             String mainClass,
             String[] additionalArgs,
             String[] mcAdditionalArgs,

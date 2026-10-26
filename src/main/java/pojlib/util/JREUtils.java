@@ -269,7 +269,7 @@ public class JREUtils {
      * @return A list filled with args.
      */
     public static List<String> getJavaArgs(Context ctx, String gameDir, String jvmHome) {
-        File resConfFile = new File(ctx.getExternalFilesDir(null) , "/hacks/resolv.conf");
+        File resConfFile = new File(ctx.getExternalFilesDir(null) , "/resources/resolv.conf");
         try {
             if(!resConfFile.exists()) {
                 resConfFile.createNewFile();
